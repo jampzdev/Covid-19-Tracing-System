@@ -37,11 +37,10 @@ function Container (props) {
   const [view, setView] = useState("info");
 
   const [isLogin, setIsLogin] = useState(true);
-  const [phoneNumberLogin, setPhoneNumberLogin] = useState("");
+  const [phoneNumberLogin, setPhoneNumberLogin] = useState("+63");
   const [state, setState] = useState({
-    firstName: "",
-    lastName: "",
-    phoneNumber: "",
+    name: "",
+    phoneNumber: "+63",
     caseID: ""
   });
 
@@ -68,8 +67,8 @@ function Container (props) {
     Amplify.configure({
       Auth: {
         region: "us-east-1",
-        userPoolId: "us-east-1_0ALSymhqt",
-        userPoolWebClientId: "2ti454ncsvu168ic6099da8d2i"
+        userPoolId: "us-east-1_yeBWTkyZM",
+        userPoolWebClientId: "10hn7lcvarkn7o0982ojfngc42"
       }
     });
 
@@ -98,21 +97,20 @@ function Container (props) {
   };
 
   const onClickRegister = async () => {
-
     setSubmitting(true);
-    axios.post("https://xgmcrilfq1.execute-api.us-east-1.amazonaws.com/COVID/register", {
+    axios.post("https://lltkyad8xg.execute-api.us-east-1.amazonaws.com/COVID/register", {
       pn: state.phoneNumber,
-      fn: state.firstName,
-      ln: state.lastName,
+      n: state.name,
       cid: state.caseID
-    }).then(response => {
-      console.log(response)
+    }).then(async (response) => {
+      
       if (response.data.errorMessage && response.data.errorMessage === "An account with the given phone_number already exists."){
         setSnackBar({ open: true, message: "Phone number already registered."})
       } else {
-        setView("verify-registration") 
+        onClickLogin(state.phoneNumber)
       }
       setSubmitting(false);
+
     }).catch(error => {
       console.log(error)
       setSubmitting(false);
@@ -121,25 +119,28 @@ function Container (props) {
 
   const onClickVerifyReg = async () => {
     setSubmitting(true);
-    axios.post("https://xgmcrilfq1.execute-api.us-east-1.amazonaws.com/COVID/confirm-user", {
+    axios.post("https://lltkyad8xg.execute-api.us-east-1.amazonaws.com/COVID/confirm-user", {
       pn: state.phoneNumber,
       cc: `${code.a}${code.b}${code.c}${code.d}${code.e}${code.f}`
     }).then(response => {
-      console.log(response)
-      Auth.signIn(state.phoneNumber)
-      .then(success => {
-        localStorage.setItem("token", success);
-        window.location = "/profile";
-      })
+      if (response.data.errorMessage) {
+        setSnackBar({ open: true, message: response.data.errorMessage})
+      } else {
+        Auth.signIn(state.phoneNumber)
+        .then(success => {
+          localStorage.setItem("token", success);
+          window.location = "/contacts";
+        })
+      }
     }).catch(error => {
       console.log(error)
       setSubmitting(false);
     });
   };
 
-  const onClickLogin = async () => {
+  const onClickLogin = async (phonNumber_async) => {
     setSubmitting(true);
-    Auth.signIn(phoneNumberLogin)
+    await Auth.signIn(phonNumber_async ? phonNumber_async : phoneNumberLogin)
     .then(success => {
       console.log(success)
       setCognitoUser(success);
@@ -148,7 +149,7 @@ function Container (props) {
       document.getElementById("code-a").focus();
     })
     .catch(err => {
-      console.log(err)
+      setSnackBar({ open: true, message: "Phone number not registered."})
       setSubmitting(false);
     });
   }
@@ -156,20 +157,35 @@ function Container (props) {
   const onClickVerifyLogin = async () => {
     setSubmitting(true);
     Auth.sendCustomChallengeAnswer(cognitoUser, `${code.a}${code.b}${code.c}${code.d}${code.e}${code.f}`)
-    .then(response => {
-      localStorage.setItem("token", JSON.stringify(cognitoUser));
-      window.location = "/contacts";
+    .then(async (response) => {
+      console.log(response);
+
+      const isAuthenticate = await isAuthenticated();
+
+      if (isAuthenticate) {
+        localStorage.setItem("token", JSON.stringify(cognitoUser));
+        window.location = "/contacts";
+      } else {
+        setSnackBar({ open: true, message: "Code is invalid"})
+      }
       setSubmitting(false);
     }).catch(error => {
       setSubmitting(false);
     })
   }
 
+  const isAuthenticated = async () => {
+    try {
+      await Auth.currentSession();
+      return true;
+    } catch {
+      return false;
+    }
+  }
   const validateReg = () => {
     if (
       !/^(\+639)\d{9}$/.test(state.phoneNumber) ||
-      state.firstName.trim().length === 0 || 
-      state.lastName.trim().length === 0 || 
+      state.name.trim().length === 0 ||
       state.caseID.trim().length === 0 
     ) { return true; }
 
@@ -195,7 +211,6 @@ function Container (props) {
           )}
  
           <div className={`login-form ${view === "sign-in" ? "no-padding": ""}`}>
-
             {view === "info" && (
               <Fragment>
                 
@@ -209,14 +224,12 @@ function Container (props) {
                     </ListItemAvatar>
                     <ListItemText primary="This site will let you register your personal information to government database." />
                   </ListItem>
-
                   <ListItem>
                     <ListItemAvatar>
                       <AccountCircleIcon />
                     </ListItemAvatar>
                     <ListItemText primary="You can submit information of person's you have contact with." />
                   </ListItem>
-
 
                   <ListItem>
                     <ListItemAvatar>
@@ -260,18 +273,11 @@ function Container (props) {
                 />
 
                 <TextField
-                  id="first-name"
-                  label="First Name"
-                  value={state.firstName}
-                  onChange={handleChange("firstName")}
+                  id="name"
+                  label="Full Name"
+                  value={state.name}
+                  onChange={handleChange("name")}
                 />
-                <TextField
-                  id="last-name"
-                  label="Last Name"
-                  value={state.lastName}
-                  onChange={handleChange("lastName")}
-                />
-               
                 <TextField
                   id="caseID"
                   label="Case ID"
@@ -315,7 +321,7 @@ function Container (props) {
                   }}
                 />
 
-                <Button className="register" onClick={onClickLogin} disabled={submitting || validatePHPhoneNumber(phoneNumberLogin)}>
+                <Button className="register" onClick={() => onClickLogin(null)} disabled={submitting || validatePHPhoneNumber(phoneNumberLogin)}>
                   Sign In
                   {submitting && (
                     <CircularProgress className="progress"/>
@@ -411,7 +417,7 @@ function Container (props) {
                 </Button>
 
                 <div className="account-helper">
-                  Didn't receive the code? <br></br> <span onClick={() => setView("register")}>Resend Code</span>
+                  Didn't receive the code? <span onClick={() => setView("register")}>Resend Code</span>
                 </div>
               </Fragment>
             )}
@@ -499,7 +505,7 @@ function Container (props) {
                 </Button>
 
                 <div className="account-helper">
-                  Didn't receive the code? <br></br> <span onClick={() => setView("register")}>Resend Code</span>
+                  Didn't receive the code? <span onClick={() => setView("register")}>Resend Code</span>
                 </div>
               </Fragment>
             )}
