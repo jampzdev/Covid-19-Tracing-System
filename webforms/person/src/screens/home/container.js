@@ -411,7 +411,7 @@ function Container (props) {
                 </Button>
 
                 <div className="account-helper">
-                  Didn't receive the code? <span onClick={() => setView("register")}>Resend Code</span>
+                  Didn't receive the code? <br></br> <span onClick={() => setView("register")}>Resend Code</span>
                 </div>
               </Fragment>
             )}
@@ -499,7 +499,7 @@ function Container (props) {
                 </Button>
 
                 <div className="account-helper">
-                  Didn't receive the code? <span onClick={() => setView("register")}>Resend Code</span>
+                  Didn't receive the code? <br></br> <span onClick={() => setView("register")}>Resend Code</span>
                 </div>
               </Fragment>
             )}
